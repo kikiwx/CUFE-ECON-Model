@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cufe经济学大模型助手</title>
+
+    <!-- 引入外部库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.2/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+
+    <!-- 引入项目样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left">
+                    <div class="ai-avatar">
+                        <img src="{{ url_for('static', filename='icons/t1.svg') }}" alt="AI Assistant" />
+                    </div>
+                    <div>
+                        <h1 class="header-title">CUFE·ECON产业规划与区域发展大模型</h1>
+                        <p class="header-status">
+                            <span class="status-indicator status-loading" id="statusIndicator"></span>
+                            <span id="statusText">初始化中...</span>
+                        </p>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <div class="header-actions">
+                        <button class="header-btn" id="reportBtn">📊 生成报告</button>
+                        <button class="header-btn" id="reportListBtn">📋 报告列表</button>
+                    </div>
+                    <span class="university-name">中央财经大学经济学院</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Settings Toggle -->
+        <button class="settings-toggle" id="settingsToggle" title="设置">
+            ⚙️
+        </button>
+
+        <!-- Settings Panel -->
+        <div class="settings-panel" id="settingsPanel">
+            <div class="settings-header">
+                <h3>模型设置</h3>
+            </div>
+            <div class="settings-content">
+                <div class="setting-group">
+                    <label class="setting-label" for="maxTokens">最大生成长度</label>
+                    <input type="number" id="maxTokens" class="setting-input" value="1024" min="1" max="4096">
+                </div>
+                <div class="setting-group">
+                    <label class="setting-label" for="temperature">创造性（Temperature）</label>
+                    <input type="range" id="temperature" class="setting-input" value="0.7" min="0.1" max="2.0" step="0.1">
+                    <span class="setting-value" id="temperatureValue">0.7</span>
+                </div>
+                <div class="setting-group">
+                    <label class="setting-checkbox">
+                        <input type="checkbox" id="enableThinking" checked>
+                        <span>显示思维过程</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report List Modal -->
+        <div class="modal-overlay" id="reportListModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 class="modal-title">我的报告列表</h2>
+                    <button class="modal-close" id="closeReportListModal">×</button>
+                </div>
+                <div class="modal-content">
+                    <div id="reportListContent">
+                        <div class="loading-placeholder" id="reportListLoading">
+                            <div style="text-align: center; padding: 2rem;">
+                                <div style="font-size: 1.5rem; margin-bottom: 1rem;">📊</div>
+                                <p>正在加载报告列表...</p>
+                            </div>
+                        </div>
+                        <div id="reportListContainer" style="display: none;">
+                            <!-- 报告列表将在这里动态生成 -->
+                        </div>
+                        <div id="reportListEmpty" style="display: none;">
+                            <div style="text-align: center; padding: 3rem; color: #6b7280;">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">📋</div>
+                                <h3 style="margin-bottom: 0.5rem; color: #374151;">暂无报告</h3>
+                                <p>您还没有生成过任何报告，点击"生成报告"开始创建您的第一份报告吧！</p>
+                                <button class="btn btn-primary" style="margin-top: 1rem;" onclick="openReportModalFromList()">
+                                    📊 生成新报告
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Report Generation Modal -->
+        <div class="modal-overlay" id="reportModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 class="modal-title">生成经济学报告</h2>
+                    <button class="modal-close" id="closeReportModal">×</button>
+                </div>
+                <div class="modal-content">
+                    <div class="form-group">
+                        <label class="form-label" for="reportTopic">报告主题 *</label>
+                        <input type="text" id="reportTopic" class="form-input" placeholder="例如：2025年北京市朝阳区十五五规划文件">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="reportRequirements">具体要求</label>
+                        <textarea id="reportRequirements" class="form-textarea" placeholder="请详细描述您的报告要求，包括重点关注的方面、分析角度、数据需求等..."></textarea>
+                    </div>
+
+                    <!-- Report Progress (hidden initially) -->
+                    <div class="report-progress" id="reportProgress" style="display: none;">
+                        <div class="progress-header">
+                            <span class="progress-title">报告生成中...</span>
+                            <span class="progress-percentage" id="progressPercentage">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <div class="progress-status" id="progressStatus">准备中...</div>
+
+                        <div class="progress-sections" id="progressSections" style="display: none;">
+                            <!-- Sections will be populated dynamically -->
+                        </div>
+
+                        <!-- Download options (shown when completed) -->
+                        <div class="download-options" id="downloadOptions" style="display: none;">
+                            <a href="#" class="download-btn" id="downloadWord">📄 下载Word文档</a>
+                        </div>
+                    </div>
+
+                    <div class="modal-actions">
+                        <button class="btn btn-secondary" id="cancelReport">取消</button>
+                        <button class="btn btn-primary" id="startGeneration">开始生成</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Messages Container -->
+        <div class="messages-container" id="messagesContainer">
+            <div class="message">
+                <div class="avatar">
+                    <img src="{{ url_for('static', filename='icons/t1.svg') }}" alt="AI Assistant" style="width: 100%; height: 100%; object-fit: contain;" />
+                </div>
+                <div class="message-bubble assistant">
+                    <div class="markdown-content">
+                        <span style="color:#b22222; font-weight:bold; font-size:1.1rem;">
+                            中央财经大学经济学院 "产业规划与区域发展大模型"
+                        </span>
+                        <br><br>
+                        助力全域产业规划与区域协同发展方案构设<br>
+                        为实现中华民族伟大复兴贡献
+                        <span style="color:#b22222; font-weight:bold;">中财大智慧！一"问"直通规划方案！</span>
+                        <div class="message-time assistant" id="welcome-time"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 快捷选项 -->
+            <div class="quick-options" id="quickOptions">
+                <div class="quick-options-content">
+                    <div class="quick-options-title">✨ 热门咨询建议</div>
+                    <div class="quick-buttons">
+                        <button class="quick-button" onclick="selectQuickOption('请帮我撰写一份北京市朝阳区十五五规划文件')">
+                            <span class="quick-button-icon">📋</span>
+                            请帮我撰写一份北京市朝阳区十五五规划文件
+                        </button>
+                        <button class="quick-button" onclick="selectQuickOption('请帮我撰写一份北京市新能源汽车行业研究报告')">
+                            <span class="quick-button-icon">🚗</span>
+                            请帮我撰写一份北京市新能源汽车行业研究报告
+                        </button>
+                        <button class="quick-button" onclick="selectQuickOption('请帮我撰写一份北京市低空经济政策分析报告')">
+                            <span class="quick-button-icon">✈️</span>
+                            请帮我撰写一份北京市低空经济政策分析报告
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-container">
+            <div class="input-wrapper">
+                <textarea
+                    id="messageInput"
+                    class="input-field"
+                    placeholder="输入您的消息..."
+                    rows="1"></textarea>
+                <button id="reportButtonSmall" class="report-button" type="button" title="生成报告">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </button>
+                <button id="sendButton" class="send-button" type="button">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                    </svg>
+                </button>
+            </div>
+            <div class="input-info">
+                <span>按 Enter 发送，Shift + Enter 换行</span>
+                <span class="model-info">支持Markdown渲染 | Qwen3</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入项目脚本 -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
